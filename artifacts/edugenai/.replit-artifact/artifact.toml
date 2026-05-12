@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "EduGenAI"
+version = "1.0.0"
+id = "artifacts/edugenai"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24660
+
+[services.development]
+run = "pnpm --filter @workspace/edugenai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/edugenai", "run", "build" ]
+publicDir = "artifacts/edugenai/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24660"
+BASE_PATH = "/"
