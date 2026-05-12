@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: courses
+    description: AI course generation from PDF
+  - name: tutor
+    description: AI tutor chat
 paths:
   /healthz:
     get:
@@ -24,6 +28,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /courses/generate:
+    post:
+      operationId: generateCourse
+      tags: [courses]
+      summary: Generate course from PDF text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCourseInput"
+      responses:
+        "200":
+          description: Generated course structure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedCourse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /tutor/chat:
+    post:
+      operationId: tutorChat
+      tags: [tutor]
+      summary: Chat with AI tutor using course context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorChatInput"
+      responses:
+        "200":
+          description: SSE stream of AI tutor response
+          content:
+            text/event-stream: {}
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +89,119 @@ components:
           type: string
       required:
         - status
-
+    GenerateCourseInput:
+      type: object
+      properties:
+        pdfText:
+          type: string
+          description: Extracted text content from the uploaded PDF
+        filename:
+          type: string
+          description: Original filename of the uploaded PDF
+      required:
+        - pdfText
+        - filename
+    GeneratedUnit:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - title
+        - summary
+        - content
+        - objectives
+    GeneratedQuestion:
+      type: object
+      properties:
+        id:
+          type: integer
+        unitId:
+          type: integer
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctIndex:
+          type: integer
+        explanation:
+          type: string
+      required:
+        - id
+        - unitId
+        - question
+        - options
+        - correctIndex
+        - explanation
+    GeneratedCourse:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        assessmentPlan:
+          type: string
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedUnit"
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedQuestion"
+      required:
+        - title
+        - description
+        - assessmentPlan
+        - units
+        - questions
+    TutorChatInput:
+      type: object
+      properties:
+        message:
+          type: string
+        courseTitle:
+          type: string
+        courseContext:
+          type: string
+          description: The full extracted PDF text to ground the tutor's answers
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+      required:
+        - message
+        - courseTitle
+        - courseContext
+        - history
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+      required:
+        - role
+        - content
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

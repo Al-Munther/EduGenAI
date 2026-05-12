@@ -1,107 +1,74 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CheckCircle2, RotateCcw, Trophy } from "lucide-react";
-
-interface Question {
-  id: number;
-  text: string;
-  options: string[];
-  correctAnswer: number;
-}
-
-const questions: Question[] = [
-  {
-    id: 1,
-    text: "What is the primary goal of supervised learning?",
-    options: [
-      "To explore unlabelled data and find hidden structures",
-      "To learn a mapping from inputs to outputs based on labeled data",
-      "To maximize cumulative rewards through interaction",
-      "To reduce the dimensionality of the dataset"
-    ],
-    correctAnswer: 1
-  },
-  {
-    id: 2,
-    text: "Which of the following is a classic example of classification?",
-    options: [
-      "Predicting tomorrow's temperature",
-      "Customer segmentation based on buying behavior",
-      "Email spam detection",
-      "Teaching a robot to walk"
-    ],
-    correctAnswer: 2
-  },
-  {
-    id: 3,
-    text: "What characterizes unsupervised learning?",
-    options: [
-      "It requires a large amount of labeled training data",
-      "It deals exclusively with unlabeled data to find patterns",
-      "It learns from a sequence of actions and rewards",
-      "It is only used for continuous value prediction"
-    ],
-    correctAnswer: 1
-  },
-  {
-    id: 4,
-    text: "Which approach is typically used for predicting a continuous value like house prices?",
-    options: [
-      "Clustering",
-      "Classification",
-      "Regression",
-      "Dimensionality Reduction"
-    ],
-    correctAnswer: 2
-  },
-  {
-    id: 5,
-    text: "Reinforcement learning is best described as:",
-    options: [
-      "Learning from a teacher who provides exact answers",
-      "Finding groups of similar items in a database",
-      "An agent learning a policy by receiving rewards or penalties",
-      "Compressing data to its most important features"
-    ],
-    correctAnswer: 2
-  }
-];
+import { ArrowLeft, CheckCircle2, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { useCourse } from "@/context/CourseContext";
 
 export default function UnitTest() {
+  const [, setLocation] = useLocation();
+  const { course } = useCourse();
+
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [wrongAnswers, setWrongAnswers] = useState<number[]>([]);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!course) { setLocation("/upload"); }
+  }, [course, setLocation]);
+
+  if (!course) return null;
+
+  const questions = course.questions;
+
+  if (questions.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 text-center">
+        <p className="text-muted-foreground">No questions available. Please generate a course first.</p>
+        <Link href="/upload"><Button className="mt-4">Go to Upload</Button></Link>
+      </div>
+    );
+  }
+
+  const resetTest = () => {
+    setCurrentQuestionIdx(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setIsFinished(false);
+    setWrongAnswers([]);
+  };
+
+  const handleSubmitAnswer = () => {
     if (selectedAnswer === null) return;
-    
-    const isCorrect = parseInt(selectedAnswer) === questions[currentQuestionIdx].correctAnswer;
-    if (isCorrect) setScore(prev => prev + 1);
+    const q = questions[currentQuestionIdx];
+    const isCorrect = parseInt(selectedAnswer) === q.correctIndex;
+    if (isCorrect) {
+      setScore((s) => s + 1);
+    } else {
+      setWrongAnswers((prev) => [...prev, q.id]);
+    }
+    setShowResult(true);
+  };
 
+  const handleNext = () => {
     if (currentQuestionIdx < questions.length - 1) {
-      setCurrentQuestionIdx(prev => prev + 1);
+      setCurrentQuestionIdx((i) => i + 1);
       setSelectedAnswer(null);
+      setShowResult(false);
     } else {
       setIsFinished(true);
     }
   };
 
-  const resetTest = () => {
-    setCurrentQuestionIdx(0);
-    setSelectedAnswer(null);
-    setScore(0);
-    setIsFinished(false);
-  };
-
   if (isFinished) {
     const percentage = Math.round((score / questions.length) * 100);
-    
     return (
       <div className="max-w-2xl mx-auto mt-12">
         <Card className="shadow-lg border-2 border-primary/20 text-center overflow-hidden">
@@ -110,22 +77,24 @@ export default function UnitTest() {
               <Trophy className="w-10 h-10" />
             </div>
             <h2 className="text-3xl font-bold tracking-tight mb-2">Test Complete!</h2>
-            <p className="text-muted-foreground text-lg">Unit 2: Core Topics and Examples</p>
+            <p className="text-muted-foreground text-lg">{course.title}</p>
           </div>
-          
+
           <CardContent className="p-8 space-y-8">
             <div>
               <div className="text-5xl font-black text-primary mb-2">{score} / {questions.length}</div>
               <div className="text-xl font-medium text-foreground">{percentage}% Score</div>
             </div>
-            
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-left">
-              <h4 className="font-bold text-blue-900 flex items-center gap-2 mb-2">
-                <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                Personalized Feedback
+
+            <div className={`border rounded-xl p-6 text-left ${percentage >= 70 ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"}`}>
+              <h4 className={`font-bold flex items-center gap-2 mb-2 ${percentage >= 70 ? "text-green-900" : "text-amber-900"}`}>
+                <CheckCircle2 className={`w-5 h-5 ${percentage >= 70 ? "text-green-600" : "text-amber-600"}`} />
+                {percentage >= 70 ? "Great work!" : "Keep reviewing!"}
               </h4>
-              <p className="text-blue-800 text-sm leading-relaxed">
-                Great performance! You scored well on general concepts. You should review Unit 2 briefly because your incorrect answers were related to specific differences between regression and clustering.
+              <p className={`text-sm leading-relaxed ${percentage >= 70 ? "text-green-800" : "text-amber-800"}`}>
+                {percentage >= 70
+                  ? `You scored ${percentage}% on the material from "${course.title}". You have a strong grasp of the content.`
+                  : `You scored ${percentage}%. Review the units covered in this course and retake the test to improve your score.`}
               </p>
             </div>
 
@@ -147,6 +116,7 @@ export default function UnitTest() {
 
   const question = questions[currentQuestionIdx];
   const progress = ((currentQuestionIdx + 1) / questions.length) * 100;
+  const selectedInt = selectedAnswer !== null ? parseInt(selectedAnswer) : null;
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
@@ -158,8 +128,10 @@ export default function UnitTest() {
         </Link>
         <div className="flex-1">
           <div className="flex justify-between items-end mb-2">
-            <h2 className="text-lg font-bold text-foreground">Unit 2 Test</h2>
-            <span className="text-sm font-medium text-muted-foreground">Question {currentQuestionIdx + 1} of {questions.length}</span>
+            <h2 className="text-lg font-bold text-foreground">{course.title} — Unit Test</h2>
+            <span className="text-sm font-medium text-muted-foreground">
+              Question {currentQuestionIdx + 1} of {questions.length}
+            </span>
           </div>
           <Progress value={progress} className="h-2" />
         </div>
@@ -167,39 +139,72 @@ export default function UnitTest() {
 
       <Card className="shadow-sm border">
         <CardContent className="p-8 md:p-10 space-y-8">
-          <h3 className="text-2xl font-semibold leading-snug">{question.text}</h3>
-          
-          <RadioGroup 
-            value={selectedAnswer || ""} 
-            onValueChange={setSelectedAnswer}
+          <div>
+            <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">
+              Unit {question.unitId}
+            </div>
+            <h3 className="text-xl font-semibold leading-snug">{question.question}</h3>
+          </div>
+
+          <RadioGroup
+            value={selectedAnswer || ""}
+            onValueChange={(v) => { if (!showResult) setSelectedAnswer(v); }}
             className="space-y-3"
           >
-            {question.options.map((opt, i) => (
-              <div key={i} className="flex items-center space-x-3">
-                <RadioGroupItem 
-                  value={i.toString()} 
-                  id={`opt-${i}`}
-                  className="w-5 h-5 border-2 text-primary"
-                />
-                <Label 
-                  htmlFor={`opt-${i}`} 
-                  className={`flex-1 p-4 border rounded-lg cursor-pointer transition-colors text-base font-normal hover:bg-muted/50 ${selectedAnswer === i.toString() ? 'border-primary bg-primary/5 shadow-sm' : 'border-border'}`}
-                >
-                  {opt}
-                </Label>
-              </div>
-            ))}
+            {question.options.map((opt, i) => {
+              let labelClass = "flex-1 p-4 border rounded-lg cursor-pointer transition-colors text-base font-normal";
+              if (showResult) {
+                if (i === question.correctIndex) labelClass += " border-green-500 bg-green-50 text-green-900";
+                else if (selectedInt === i) labelClass += " border-red-400 bg-red-50 text-red-900";
+                else labelClass += " border-border text-muted-foreground cursor-default";
+              } else {
+                labelClass += selectedAnswer === i.toString()
+                  ? " border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
+                  : " border-border hover:bg-muted/50";
+              }
+
+              return (
+                <div key={i} className="flex items-center space-x-3">
+                  <RadioGroupItem
+                    value={i.toString()}
+                    id={`opt-${i}`}
+                    className="w-5 h-5 border-2 text-primary"
+                    disabled={showResult}
+                  />
+                  <Label htmlFor={`opt-${i}`} className={labelClass}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{opt}</span>
+                      {showResult && i === question.correctIndex && <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />}
+                      {showResult && selectedInt === i && i !== question.correctIndex && <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />}
+                    </div>
+                  </Label>
+                </div>
+              );
+            })}
           </RadioGroup>
-          
-          <div className="pt-6 border-t flex justify-end">
-            <Button 
-              size="lg" 
-              onClick={handleSubmit} 
-              disabled={selectedAnswer === null}
-              className="px-8"
-            >
-              {currentQuestionIdx < questions.length - 1 ? "Submit Answer & Continue" : "Finish Test"}
-            </Button>
+
+          {showResult && question.explanation && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">
+              <span className="font-bold">Explanation: </span>{question.explanation}
+            </div>
+          )}
+
+          <div className="pt-4 border-t flex justify-end">
+            {!showResult ? (
+              <Button
+                size="lg"
+                onClick={handleSubmitAnswer}
+                disabled={selectedAnswer === null}
+                className="px-8"
+              >
+                Submit Answer
+              </Button>
+            ) : (
+              <Button size="lg" onClick={handleNext} className="px-8 gap-2">
+                {currentQuestionIdx < questions.length - 1 ? "Next Question" : "See Results"}
+                <CheckCircle2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

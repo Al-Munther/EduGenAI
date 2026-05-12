@@ -8,3 +8,52 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface GenerateCourseInput {
+  /** Extracted text content from the uploaded PDF */
+  pdfText: string;
+  /** Original filename of the uploaded PDF */
+  filename: string;
+}
+
+export interface GeneratedUnit {
+  id: number;
+  title: string;
+  summary: string;
+  content: string;
+  objectives: string[];
+}
+
+export interface GeneratedQuestion {
+  id: number;
+  unitId: number;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface GeneratedCourse {
+  title: string;
+  description: string;
+  assessmentPlan: string;
+  units: GeneratedUnit[];
+  questions: GeneratedQuestion[];
+}
+
+export interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+export interface TutorChatInput {
+  message: string;
+  courseTitle: string;
+  /** The full extracted PDF text to ground the tutor's answers */
+  courseContext: string;
+  history: ChatMessage[];
+}
+
+export interface ApiError {
+  error: string;
+}

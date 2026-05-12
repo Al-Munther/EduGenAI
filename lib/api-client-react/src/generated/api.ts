@@ -5,18 +5,27 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  ApiError,
+  GenerateCourseInput,
+  GeneratedCourse,
+  HealthStatus,
+  TutorChatInput,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +108,175 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Generate course from PDF text
+ */
+export const getGenerateCourseUrl = () => {
+  return `/api/courses/generate`;
+};
+
+export const generateCourse = async (
+  generateCourseInput: GenerateCourseInput,
+  options?: RequestInit,
+): Promise<GeneratedCourse> => {
+  return customFetch<GeneratedCourse>(getGenerateCourseUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(generateCourseInput),
+  });
+};
+
+export const getGenerateCourseMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateCourse>>,
+    TError,
+    { data: BodyType<GenerateCourseInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateCourse>>,
+  TError,
+  { data: BodyType<GenerateCourseInput> },
+  TContext
+> => {
+  const mutationKey = ["generateCourse"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateCourse>>,
+    { data: BodyType<GenerateCourseInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return generateCourse(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateCourseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateCourse>>
+>;
+export type GenerateCourseMutationBody = BodyType<GenerateCourseInput>;
+export type GenerateCourseMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Generate course from PDF text
+ */
+export const useGenerateCourse = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateCourse>>,
+    TError,
+    { data: BodyType<GenerateCourseInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateCourse>>,
+  TError,
+  { data: BodyType<GenerateCourseInput> },
+  TContext
+> => {
+  return useMutation(getGenerateCourseMutationOptions(options));
+};
+
+/**
+ * @summary Chat with AI tutor using course context
+ */
+export const getTutorChatUrl = () => {
+  return `/api/tutor/chat`;
+};
+
+export const tutorChat = async (
+  tutorChatInput: TutorChatInput,
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getTutorChatUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(tutorChatInput),
+  });
+};
+
+export const getTutorChatMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof tutorChat>>,
+    TError,
+    { data: BodyType<TutorChatInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof tutorChat>>,
+  TError,
+  { data: BodyType<TutorChatInput> },
+  TContext
+> => {
+  const mutationKey = ["tutorChat"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof tutorChat>>,
+    { data: BodyType<TutorChatInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return tutorChat(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TutorChatMutationResult = NonNullable<
+  Awaited<ReturnType<typeof tutorChat>>
+>;
+export type TutorChatMutationBody = BodyType<TutorChatInput>;
+export type TutorChatMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Chat with AI tutor using course context
+ */
+export const useTutorChat = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof tutorChat>>,
+    TError,
+    { data: BodyType<TutorChatInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof tutorChat>>,
+  TError,
+  { data: BodyType<TutorChatInput> },
+  TContext
+> => {
+  return useMutation(getTutorChatMutationOptions(options));
+};

@@ -14,3 +14,55 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Generate course from PDF text
+ */
+export const GenerateCourseBody = zod.object({
+  pdfText: zod
+    .string()
+    .describe("Extracted text content from the uploaded PDF"),
+  filename: zod.string().describe("Original filename of the uploaded PDF"),
+});
+
+export const GenerateCourseResponse = zod.object({
+  title: zod.string(),
+  description: zod.string(),
+  assessmentPlan: zod.string(),
+  units: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      summary: zod.string(),
+      content: zod.string(),
+      objectives: zod.array(zod.string()),
+    }),
+  ),
+  questions: zod.array(
+    zod.object({
+      id: zod.number(),
+      unitId: zod.number(),
+      question: zod.string(),
+      options: zod.array(zod.string()),
+      correctIndex: zod.number(),
+      explanation: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Chat with AI tutor using course context
+ */
+export const TutorChatBody = zod.object({
+  message: zod.string(),
+  courseTitle: zod.string(),
+  courseContext: zod
+    .string()
+    .describe("The full extracted PDF text to ground the tutor's answers"),
+  history: zod.array(
+    zod.object({
+      role: zod.string(),
+      content: zod.string(),
+    }),
+  ),
+});

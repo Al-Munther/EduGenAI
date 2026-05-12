@@ -11,6 +11,7 @@ import TeacherReview from "@/pages/teacher-review";
 import StudentCourse from "@/pages/student-course";
 import AiTutor from "@/pages/ai-tutor";
 import UnitTest from "@/pages/unit-test";
+import { CourseProvider } from "@/context/CourseContext";
 
 const queryClient = new QueryClient();
 
@@ -35,9 +36,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <CourseProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </CourseProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

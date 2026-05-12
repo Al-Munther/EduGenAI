@@ -1,144 +1,166 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UploadCloud, FileText, Loader2, Wand2 } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import { UploadCloud, FileText, Loader2, Wand2, CheckCircle2, AlertCircle } from "lucide-react";
+import { useCourse } from "@/context/CourseContext";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function PdfUpload() {
   const [, setLocation] = useLocation();
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const { setCourse, setPdfText, setFilename } = useCourse();
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [opts, setOpts] = useState({ units: true, tests: true, tutor: true });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [options, setOptions] = useState({
-    generateUnits: true,
-    generateTests: true,
-    enableTutor: true,
-  });
-
-  const handleSimulateSelect = () => {
-    setIsUploading(true);
-    setTimeout(() => {
-      setFileName("Introduction_to_AI.pdf");
-      setIsUploading(false);
-    }, 800);
+  const handleFileSelect = (file: File) => {
+    if (file.type !== "application/pdf" && !file.name.endsWith(".pdf")) {
+      setError("Please upload a PDF file.");
+      return;
+    }
+    setError(null);
+    setSelectedFile(file);
   };
 
-  const handleProcess = () => {
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const handleProcess = async () => {
+    if (!selectedFile) return;
     setIsProcessing(true);
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("pdf", selectedFile);
+
+      const res = await fetch(`${BASE}/api/courses/generate-from-pdf`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(data.error || `Server error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const { pdfText, ...courseData } = data;
+
+      setCourse(courseData);
+      setPdfText(pdfText || "");
+      setFilename(selectedFile.name);
+
       setLocation("/generate");
-    }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to process PDF. Please try again.");
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 pb-8">
+    <div className="max-w-2xl mx-auto space-y-8 pb-12">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">Create New Course</h2>
-        <p className="text-muted-foreground">Upload your syllabus or lecture notes, and our AI will automatically structure a complete course for you.</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Upload Course Material</h2>
+        <p className="text-muted-foreground mt-1">Upload a PDF — our AI will generate a full course from your material.</p>
       </div>
 
-      <Card className="border-2 border-dashed border-primary/20 shadow-sm overflow-hidden">
-        <CardContent className={`p-12 flex flex-col items-center justify-center text-center transition-colors ${fileName ? 'bg-primary/5' : 'bg-background hover:bg-muted/50'}`}>
-          {isUploading ? (
-            <div className="space-y-4">
-              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-              <p className="text-muted-foreground font-medium">Uploading file...</p>
-            </div>
-          ) : fileName ? (
-            <div className="space-y-4">
-              <div className="w-16 h-16 bg-primary/10 text-primary rounded-xl flex items-center justify-center mx-auto">
-                <FileText className="w-8 h-8" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground text-lg">{fileName}</p>
-                <p className="text-sm text-muted-foreground mt-1">Ready for processing</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setFileName(null)} className="mt-4">
-                Remove file
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="w-16 h-16 bg-muted text-muted-foreground rounded-full flex items-center justify-center mx-auto">
-                <UploadCloud className="w-8 h-8" />
-              </div>
-              <div>
+      <Card className="shadow-sm border">
+        <CardContent className="p-8 space-y-6">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+              isDragging ? "border-primary bg-primary/5" : selectedFile ? "border-green-400 bg-green-50" : "border-border hover:border-primary/50 hover:bg-muted/30"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+            />
+            {selectedFile ? (
+              <>
+                <CheckCircle2 className="w-12 h-12 text-green-500 mb-4" />
+                <div className="flex items-center gap-2 text-green-700 font-semibold text-lg">
+                  <FileText className="w-5 h-5" />
+                  {selectedFile.name}
+                </div>
+                <p className="text-green-600 text-sm mt-1">{(selectedFile.size / 1024).toFixed(0)} KB — Click to change file</p>
+              </>
+            ) : (
+              <>
+                <UploadCloud className="w-14 h-14 text-muted-foreground mb-4" />
                 <p className="font-semibold text-foreground text-lg">Upload syllabus or lecture notes</p>
-                <p className="text-sm text-muted-foreground mt-1">Drag and drop your PDF here, or click to browse</p>
-              </div>
-              <Button onClick={handleSimulateSelect} className="mt-6">
-                Browse Files
-              </Button>
+                <p className="text-muted-foreground text-sm mt-1">Drag and drop a PDF here, or click to browse</p>
+                <p className="text-xs text-muted-foreground/60 mt-3">Supports PDF up to 20MB</p>
+              </>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-4 py-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              {error}
             </div>
           )}
+
+          <div className="space-y-3 pt-2">
+            <p className="text-sm font-semibold text-foreground">AI Generation Options</p>
+            {([
+              { key: "units", label: "Generate course units", desc: "Break content into structured learning units" },
+              { key: "tests", label: "Generate unit tests", desc: "Create assessment questions from the material" },
+              { key: "tutor", label: "Enable AI Tutor", desc: "Allow students to ask questions about the content" },
+            ] as const).map(({ key, label, desc }) => (
+              <div key={key} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/20">
+                <Checkbox
+                  id={key}
+                  checked={opts[key]}
+                  onCheckedChange={(v) => setOpts({ ...opts, [key]: !!v })}
+                  className="mt-0.5"
+                />
+                <div>
+                  <label htmlFor={key} className="font-medium text-sm text-foreground cursor-pointer">{label}</label>
+                  <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            onClick={handleProcess}
+            disabled={!selectedFile || isProcessing}
+            className="w-full gap-2 h-12 text-base font-semibold shadow-sm"
+            size="lg"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Processing with AI... This may take a moment
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-5 h-5" />
+                Process with AI
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
-
-      <div className="bg-card border rounded-xl p-6 shadow-sm space-y-6">
-        <h3 className="font-semibold text-lg border-b pb-4">Generation Options</h3>
-        
-        <div className="space-y-4">
-          <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="opt1" 
-              checked={options.generateUnits}
-              onCheckedChange={(c) => setOptions(p => ({...p, generateUnits: !!c}))}
-            />
-            <div className="grid gap-1.5 leading-none">
-              <Label htmlFor="opt1" className="font-medium text-base">Generate course units</Label>
-              <p className="text-sm text-muted-foreground">Extract main topics and create structured learning modules.</p>
-            </div>
-          </div>
-          
-          <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="opt2" 
-              checked={options.generateTests}
-              onCheckedChange={(c) => setOptions(p => ({...p, generateTests: !!c}))}
-            />
-            <div className="grid gap-1.5 leading-none">
-              <Label htmlFor="opt2" className="font-medium text-base">Generate unit tests</Label>
-              <p className="text-sm text-muted-foreground">Create multiple-choice questions to assess student comprehension.</p>
-            </div>
-          </div>
-          
-          <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="opt3" 
-              checked={options.enableTutor}
-              onCheckedChange={(c) => setOptions(p => ({...p, enableTutor: !!c}))}
-            />
-            <div className="grid gap-1.5 leading-none">
-              <Label htmlFor="opt3" className="font-medium text-base">Enable AI Tutor</Label>
-              <p className="text-sm text-muted-foreground">Allow students to chat with an AI restricted to the uploaded material.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end pt-4">
-        <Button 
-          size="lg" 
-          disabled={!fileName || isProcessing} 
-          onClick={handleProcess}
-          className="w-full sm:w-auto px-8 gap-2 shadow-md"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Processing with AI...
-            </>
-          ) : (
-            <>
-              <Wand2 className="w-5 h-5" />
-              Process with AI
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

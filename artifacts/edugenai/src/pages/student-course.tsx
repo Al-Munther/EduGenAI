@@ -1,21 +1,42 @@
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, MessageCircle, FileQuestion, ChevronRight, CheckCircle2, Circle } from "lucide-react";
+import { MessageCircle, ChevronRight, CheckCircle2, Circle, BookOpen } from "lucide-react";
+import { useCourse } from "@/context/CourseContext";
 
 export default function StudentCourse() {
-  const progress = 25; // Unit 1 complete, Unit 2 starting
+  const [, setLocation] = useLocation();
+  const { course } = useCourse();
+  const [selectedUnitId, setSelectedUnitId] = useState<number>(1);
+  const [completedUnits, setCompletedUnits] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (!course) { setLocation("/upload"); return; }
+    setSelectedUnitId(course.units[0]?.id ?? 1);
+  }, [course, setLocation]);
+
+  if (!course) return null;
+
+  const selectedUnit = course.units.find((u) => u.id === selectedUnitId) ?? course.units[0];
+  const progress = Math.round((completedUnits.size / course.units.length) * 100);
+
+  const markComplete = () => {
+    setCompletedUnits((prev) => new Set([...prev, selectedUnitId]));
+    const currentIdx = course.units.findIndex((u) => u.id === selectedUnitId);
+    const next = course.units[currentIdx + 1];
+    if (next) setSelectedUnitId(next.id);
+  };
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 pb-8 h-[calc(100vh-8rem)]">
-      {/* Sidebar Navigation for Course */}
-      <div className="w-full lg:w-72 flex-shrink-0 space-y-6">
+      {/* Sidebar */}
+      <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
         <div className="bg-card border rounded-xl p-5 shadow-sm">
-          <h3 className="font-bold text-foreground mb-4">Course Progress</h3>
-          <div className="space-y-2 mb-4">
+          <h3 className="font-bold text-foreground mb-1 text-sm">{course.title}</h3>
+          <div className="space-y-2 mt-3">
             <div className="flex justify-between text-sm font-medium">
-              <span>Unit 2 of 4</span>
+              <span className="text-muted-foreground">{completedUnits.size} of {course.units.length} units</span>
               <span className="text-primary">{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -23,99 +44,107 @@ export default function StudentCourse() {
         </div>
 
         <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 bg-muted/50 border-b font-semibold text-sm uppercase tracking-wider text-muted-foreground">
-            Syllabus
+          <div className="p-3 bg-muted/50 border-b font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+            Course Units
           </div>
-          <nav className="flex flex-col">
-            <button className="flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors border-b">
-              <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-              <div>
-                <div className="font-medium text-foreground text-sm">Unit 1</div>
-                <div className="text-xs text-muted-foreground line-clamp-1">Introduction & Concepts</div>
-              </div>
-            </button>
-            <button className="flex items-center gap-3 p-4 text-left bg-primary/5 border-l-4 border-l-primary border-b">
-              <Circle className="w-5 h-5 text-primary flex-shrink-0" />
-              <div>
-                <div className="font-bold text-primary text-sm">Unit 2</div>
-                <div className="text-xs text-foreground font-medium line-clamp-1">Core Topics and Examples</div>
-              </div>
-            </button>
-            <button className="flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors border-b opacity-70">
-              <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <div>
-                <div className="font-medium text-foreground text-sm">Unit 3</div>
-                <div className="text-xs text-muted-foreground line-clamp-1">Practical Application</div>
-              </div>
-            </button>
-            <button className="flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors opacity-70">
-              <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <div>
-                <div className="font-medium text-foreground text-sm">Unit 4</div>
-                <div className="text-xs text-muted-foreground line-clamp-1">Review and Assessment</div>
-              </div>
-            </button>
+          <nav className="flex flex-col divide-y">
+            {course.units.map((unit) => {
+              const isActive = unit.id === selectedUnitId;
+              const isDone = completedUnits.has(unit.id);
+              return (
+                <button
+                  key={unit.id}
+                  onClick={() => setSelectedUnitId(unit.id)}
+                  className={`flex items-center gap-3 p-4 text-left w-full transition-colors ${
+                    isActive
+                      ? "bg-primary/8 border-l-4 border-l-primary"
+                      : "hover:bg-muted/50 border-l-4 border-l-transparent"
+                  }`}
+                >
+                  {isDone ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  ) : (
+                    <Circle className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  )}
+                  <div className="min-w-0">
+                    <div className={`font-medium text-sm ${isActive ? "text-primary" : "text-foreground"}`}>
+                      Unit {unit.id}
+                    </div>
+                    <div className={`text-xs line-clamp-1 mt-0.5 ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                      {unit.title}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </nav>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 bg-card border rounded-xl shadow-sm overflow-hidden">
-        <div className="border-b px-8 py-6 bg-muted/20">
-          <div className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Unit 2</div>
-          <h2 className="text-2xl font-bold text-foreground">Core Topics and Examples</h2>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-8 prose prose-slate max-w-none">
-          <p className="text-lg text-muted-foreground leading-relaxed">
-            In this unit, we dive deep into the fundamental paradigms of machine learning. Understanding these categories is essential for choosing the right approach to solve specific problems.
-          </p>
-          
-          <h3>Supervised Learning</h3>
-          <p>
-            Supervised learning is the most common form of machine learning. The model is trained on a labeled dataset, meaning that each training example is paired with an output label. The goal is for the model to learn the mapping function from inputs to outputs so that it can accurately predict the labels for new, unseen data.
-          </p>
-          <ul>
-            <li><strong>Classification:</strong> Predicting a discrete category (e.g., spam detection, image recognition).</li>
-            <li><strong>Regression:</strong> Predicting a continuous value (e.g., predicting house prices, temperature forecasting).</li>
-          </ul>
+        {selectedUnit && (
+          <>
+            <div className="border-b px-8 py-6 bg-muted/20 flex-shrink-0">
+              <div className="text-sm font-semibold text-primary uppercase tracking-wider mb-1">Unit {selectedUnit.id}</div>
+              <h2 className="text-2xl font-bold text-foreground">{selectedUnit.title}</h2>
+              <p className="text-muted-foreground mt-1 text-sm">{selectedUnit.summary}</p>
+            </div>
 
-          <h3>Unsupervised Learning</h3>
-          <p>
-            Unlike supervised learning, unsupervised learning deals with unlabeled data. The system tries to learn without a teacher. It explores the data to find hidden structures, patterns, or relationships.
-          </p>
-          <ul>
-            <li><strong>Clustering:</strong> Grouping similar data points together (e.g., customer segmentation).</li>
-            <li><strong>Dimensionality Reduction:</strong> Reducing the number of variables while preserving the essential information (e.g., PCA).</li>
-          </ul>
+            <div className="flex-1 overflow-y-auto p-8">
+              {selectedUnit.objectives.length > 0 && (
+                <div className="mb-6 bg-primary/5 border border-primary/15 rounded-xl p-5">
+                  <h4 className="font-bold text-foreground flex items-center gap-2 mb-3">
+                    <BookOpen className="w-4 h-4 text-primary" />
+                    Learning Objectives
+                  </h4>
+                  <ul className="space-y-2">
+                    {selectedUnit.objectives.map((obj, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                        {obj}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-          <h3>Reinforcement Learning</h3>
-          <p>
-            This type of learning relies on an agent interacting with an environment. The agent takes actions and receives feedback in the form of rewards or penalties. The goal is to learn a policy that maximizes the total cumulative reward over time.
-          </p>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 my-6">
-            <h4 className="text-blue-800 font-bold m-0 mb-2">Key Takeaway</h4>
-            <p className="text-blue-900 m-0 text-sm">
-              The choice of learning algorithm depends entirely on your data (labeled vs. unlabeled) and your objective (predicting a value, finding structure, or maximizing reward).
-            </p>
-          </div>
-        </div>
+              <div className="prose prose-slate max-w-none">
+                {selectedUnit.content.split("\n").filter(Boolean).map((para, i) => (
+                  <p key={i} className="leading-relaxed text-foreground mb-4">{para}</p>
+                ))}
+              </div>
+            </div>
 
-        <div className="border-t p-6 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/tutor">
-            <Button variant="outline" className="gap-2 bg-background">
-              <MessageCircle className="w-4 h-4" />
-              Open AI Tutor
-            </Button>
-          </Link>
-          <Link href="/test">
-            <Button className="gap-2 shadow-sm px-6">
-              Start Unit Test
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </Link>
-        </div>
+            <div className="border-t p-6 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0">
+              <Link href="/tutor">
+                <Button variant="outline" className="gap-2 bg-background">
+                  <MessageCircle className="w-4 h-4" />
+                  Ask AI Tutor
+                </Button>
+              </Link>
+              <div className="flex items-center gap-3">
+                <Link href="/test">
+                  <Button variant="outline" className="gap-2">
+                    Unit Test
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <Button
+                  className="gap-2 shadow-sm px-6"
+                  onClick={markComplete}
+                  disabled={completedUnits.has(selectedUnitId)}
+                >
+                  {completedUnits.has(selectedUnitId) ? (
+                    <><CheckCircle2 className="w-4 h-4" /> Completed</>
+                  ) : (
+                    <>Mark Complete <ChevronRight className="w-4 h-4" /></>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

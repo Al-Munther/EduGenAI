@@ -6,4 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./apiError";
+export * from "./chatMessage";
+export * from "./generateCourseInput";
+export * from "./generatedCourse";
+export * from "./generatedQuestion";
+export * from "./generatedUnit";
 export * from "./healthStatus";
+export * from "./tutorChatInput";
