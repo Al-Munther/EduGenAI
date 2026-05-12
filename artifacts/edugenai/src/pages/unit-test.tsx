@@ -7,20 +7,21 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, CheckCircle2, RotateCcw, Trophy, XCircle } from "lucide-react";
 import { useCourse } from "@/context/CourseContext";
+import { useSaveProgress } from "@workspace/api-client-react";
 
 export default function UnitTest() {
   const [, setLocation] = useLocation();
-  const { course } = useCourse();
+  const { course, courseId } = useCourse();
+  const saveProgressMutation = useSaveProgress();
 
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [wrongAnswers, setWrongAnswers] = useState<number[]>([]);
 
   useEffect(() => {
-    if (!course) { setLocation("/upload"); }
+    if (!course) { setLocation("/courses"); }
   }, [course, setLocation]);
 
   if (!course) return null;
@@ -42,18 +43,13 @@ export default function UnitTest() {
     setShowResult(false);
     setScore(0);
     setIsFinished(false);
-    setWrongAnswers([]);
   };
 
   const handleSubmitAnswer = () => {
     if (selectedAnswer === null) return;
     const q = questions[currentQuestionIdx];
     const isCorrect = parseInt(selectedAnswer) === q.correctIndex;
-    if (isCorrect) {
-      setScore((s) => s + 1);
-    } else {
-      setWrongAnswers((prev) => [...prev, q.id]);
-    }
+    if (isCorrect) setScore((s) => s + 1);
     setShowResult(true);
   };
 
@@ -63,7 +59,19 @@ export default function UnitTest() {
       setSelectedAnswer(null);
       setShowResult(false);
     } else {
+      const finalScore = score + (selectedAnswer !== null && parseInt(selectedAnswer) === questions[currentQuestionIdx].correctIndex ? 0 : 0);
       setIsFinished(true);
+      if (courseId) {
+        saveProgressMutation.mutate({
+          data: {
+            courseId,
+            unitId: 0,
+            completed: true,
+            score: finalScore,
+            total: questions.length,
+          },
+        });
+      }
     }
   };
 
@@ -93,8 +101,8 @@ export default function UnitTest() {
               </h4>
               <p className={`text-sm leading-relaxed ${percentage >= 70 ? "text-green-800" : "text-amber-800"}`}>
                 {percentage >= 70
-                  ? `You scored ${percentage}% on the material from "${course.title}". You have a strong grasp of the content.`
-                  : `You scored ${percentage}%. Review the units covered in this course and retake the test to improve your score.`}
+                  ? `You scored ${percentage}% — strong understanding of the course material.`
+                  : `You scored ${percentage}%. Review the units and retake the test to improve your score.`}
               </p>
             </div>
 
@@ -128,7 +136,7 @@ export default function UnitTest() {
         </Link>
         <div className="flex-1">
           <div className="flex justify-between items-end mb-2">
-            <h2 className="text-lg font-bold text-foreground">{course.title} — Unit Test</h2>
+            <h2 className="text-lg font-bold text-foreground">{course.title} — Test</h2>
             <span className="text-sm font-medium text-muted-foreground">
               Question {currentQuestionIdx + 1} of {questions.length}
             </span>
@@ -159,7 +167,7 @@ export default function UnitTest() {
                 else labelClass += " border-border text-muted-foreground cursor-default";
               } else {
                 labelClass += selectedAnswer === i.toString()
-                  ? " border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
+                  ? " border-primary bg-primary/5 shadow-sm"
                   : " border-border hover:bg-muted/50";
               }
 
@@ -191,12 +199,7 @@ export default function UnitTest() {
 
           <div className="pt-4 border-t flex justify-end">
             {!showResult ? (
-              <Button
-                size="lg"
-                onClick={handleSubmitAnswer}
-                disabled={selectedAnswer === null}
-                className="px-8"
-              >
+              <Button size="lg" onClick={handleSubmitAnswer} disabled={selectedAnswer === null} className="px-8">
                 Submit Answer
               </Button>
             ) : (

@@ -51,6 +51,112 @@ export const GenerateCourseResponse = zod.object({
 });
 
 /**
+ * @summary List all published courses
+ */
+export const ListSavedCoursesResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  assessmentPlan: zod.string(),
+  units: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      summary: zod.string(),
+      content: zod.string(),
+      objectives: zod.array(zod.string()),
+    }),
+  ),
+  questions: zod.array(
+    zod.object({
+      id: zod.number(),
+      unitId: zod.number(),
+      question: zod.string(),
+      options: zod.array(zod.string()),
+      correctIndex: zod.number(),
+      explanation: zod.string(),
+    }),
+  ),
+  pdfText: zod.string(),
+  filename: zod.string(),
+  createdAt: zod.string(),
+});
+export const ListSavedCoursesResponse = zod.array(ListSavedCoursesResponseItem);
+
+/**
+ * @summary Publish and save a course to the database
+ */
+export const PublishCourseBody = zod.object({
+  title: zod.string(),
+  description: zod.string(),
+  assessmentPlan: zod.string(),
+  units: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      summary: zod.string(),
+      content: zod.string(),
+      objectives: zod.array(zod.string()),
+    }),
+  ),
+  questions: zod.array(
+    zod.object({
+      id: zod.number(),
+      unitId: zod.number(),
+      question: zod.string(),
+      options: zod.array(zod.string()),
+      correctIndex: zod.number(),
+      explanation: zod.string(),
+    }),
+  ),
+  pdfText: zod.string(),
+  filename: zod.string(),
+});
+
+/**
+ * @summary Get a single saved course by ID
+ */
+export const GetSavedCourseParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetSavedCourseResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  assessmentPlan: zod.string(),
+  units: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      summary: zod.string(),
+      content: zod.string(),
+      objectives: zod.array(zod.string()),
+    }),
+  ),
+  questions: zod.array(
+    zod.object({
+      id: zod.number(),
+      unitId: zod.number(),
+      question: zod.string(),
+      options: zod.array(zod.string()),
+      correctIndex: zod.number(),
+      explanation: zod.string(),
+    }),
+  ),
+  pdfText: zod.string(),
+  filename: zod.string(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Delete a saved course
+ */
+export const DeleteSavedCourseParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Chat with AI tutor using course context
  */
 export const TutorChatBody = zod.object({
@@ -65,4 +171,39 @@ export const TutorChatBody = zod.object({
       content: zod.string(),
     }),
   ),
+});
+
+/**
+ * @summary Get student progress for a course
+ */
+export const GetCourseProgressParams = zod.object({
+  courseId: zod.coerce.number(),
+});
+
+export const GetCourseProgressResponseItem = zod.object({
+  unitId: zod.number(),
+  completed: zod.boolean(),
+  score: zod.number().nullish(),
+  total: zod.number().nullish(),
+});
+export const GetCourseProgressResponse = zod.array(
+  GetCourseProgressResponseItem,
+);
+
+/**
+ * @summary Save or update progress for a unit
+ */
+export const SaveProgressBody = zod.object({
+  courseId: zod.number(),
+  unitId: zod.number(),
+  completed: zod.boolean(),
+  score: zod.number().nullish(),
+  total: zod.number().nullish(),
+});
+
+export const SaveProgressResponse = zod.object({
+  unitId: zod.number(),
+  completed: zod.boolean(),
+  score: zod.number().nullish(),
+  total: zod.number().nullish(),
 });

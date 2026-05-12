@@ -21,7 +21,11 @@ import type {
   GenerateCourseInput,
   GeneratedCourse,
   HealthStatus,
+  PublishCourseInput,
+  SaveProgressInput,
+  SavedCourse,
   TutorChatInput,
+  UnitProgress,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -196,6 +200,338 @@ export const useGenerateCourse = <
 };
 
 /**
+ * @summary List all published courses
+ */
+export const getListSavedCoursesUrl = () => {
+  return `/api/courses/saved`;
+};
+
+export const listSavedCourses = async (
+  options?: RequestInit,
+): Promise<SavedCourse[]> => {
+  return customFetch<SavedCourse[]>(getListSavedCoursesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListSavedCoursesQueryKey = () => {
+  return [`/api/courses/saved`] as const;
+};
+
+export const getListSavedCoursesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSavedCourses>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listSavedCourses>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListSavedCoursesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSavedCourses>>
+  > = ({ signal }) => listSavedCourses({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSavedCourses>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSavedCoursesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSavedCourses>>
+>;
+export type ListSavedCoursesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all published courses
+ */
+
+export function useListSavedCourses<
+  TData = Awaited<ReturnType<typeof listSavedCourses>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listSavedCourses>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSavedCoursesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Publish and save a course to the database
+ */
+export const getPublishCourseUrl = () => {
+  return `/api/courses/saved`;
+};
+
+export const publishCourse = async (
+  publishCourseInput: PublishCourseInput,
+  options?: RequestInit,
+): Promise<SavedCourse> => {
+  return customFetch<SavedCourse>(getPublishCourseUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(publishCourseInput),
+  });
+};
+
+export const getPublishCourseMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishCourse>>,
+    TError,
+    { data: BodyType<PublishCourseInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof publishCourse>>,
+  TError,
+  { data: BodyType<PublishCourseInput> },
+  TContext
+> => {
+  const mutationKey = ["publishCourse"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof publishCourse>>,
+    { data: BodyType<PublishCourseInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return publishCourse(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PublishCourseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof publishCourse>>
+>;
+export type PublishCourseMutationBody = BodyType<PublishCourseInput>;
+export type PublishCourseMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Publish and save a course to the database
+ */
+export const usePublishCourse = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishCourse>>,
+    TError,
+    { data: BodyType<PublishCourseInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof publishCourse>>,
+  TError,
+  { data: BodyType<PublishCourseInput> },
+  TContext
+> => {
+  return useMutation(getPublishCourseMutationOptions(options));
+};
+
+/**
+ * @summary Get a single saved course by ID
+ */
+export const getGetSavedCourseUrl = (id: number) => {
+  return `/api/courses/saved/${id}`;
+};
+
+export const getSavedCourse = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SavedCourse> => {
+  return customFetch<SavedCourse>(getGetSavedCourseUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSavedCourseQueryKey = (id: number) => {
+  return [`/api/courses/saved/${id}`] as const;
+};
+
+export const getGetSavedCourseQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSavedCourse>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSavedCourse>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSavedCourseQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSavedCourse>>> = ({
+    signal,
+  }) => getSavedCourse(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSavedCourse>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSavedCourseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSavedCourse>>
+>;
+export type GetSavedCourseQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a single saved course by ID
+ */
+
+export function useGetSavedCourse<
+  TData = Awaited<ReturnType<typeof getSavedCourse>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSavedCourse>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSavedCourseQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Delete a saved course
+ */
+export const getDeleteSavedCourseUrl = (id: number) => {
+  return `/api/courses/saved/${id}`;
+};
+
+export const deleteSavedCourse = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteSavedCourseUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteSavedCourseMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedCourse>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteSavedCourse>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteSavedCourse"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteSavedCourse>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteSavedCourse(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteSavedCourseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteSavedCourse>>
+>;
+
+export type DeleteSavedCourseMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Delete a saved course
+ */
+export const useDeleteSavedCourse = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedCourse>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteSavedCourse>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteSavedCourseMutationOptions(options));
+};
+
+/**
  * @summary Chat with AI tutor using course context
  */
 export const getTutorChatUrl = () => {
@@ -279,4 +615,179 @@ export const useTutorChat = <
   TContext
 > => {
   return useMutation(getTutorChatMutationOptions(options));
+};
+
+/**
+ * @summary Get student progress for a course
+ */
+export const getGetCourseProgressUrl = (courseId: number) => {
+  return `/api/progress/${courseId}`;
+};
+
+export const getCourseProgress = async (
+  courseId: number,
+  options?: RequestInit,
+): Promise<UnitProgress[]> => {
+  return customFetch<UnitProgress[]>(getGetCourseProgressUrl(courseId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCourseProgressQueryKey = (courseId: number) => {
+  return [`/api/progress/${courseId}`] as const;
+};
+
+export const getGetCourseProgressQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCourseProgress>>,
+  TError = ErrorType<unknown>,
+>(
+  courseId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCourseProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCourseProgressQueryKey(courseId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCourseProgress>>
+  > = ({ signal }) =>
+    getCourseProgress(courseId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!courseId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCourseProgress>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCourseProgressQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCourseProgress>>
+>;
+export type GetCourseProgressQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get student progress for a course
+ */
+
+export function useGetCourseProgress<
+  TData = Awaited<ReturnType<typeof getCourseProgress>>,
+  TError = ErrorType<unknown>,
+>(
+  courseId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCourseProgress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCourseProgressQueryOptions(courseId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save or update progress for a unit
+ */
+export const getSaveProgressUrl = () => {
+  return `/api/progress`;
+};
+
+export const saveProgress = async (
+  saveProgressInput: SaveProgressInput,
+  options?: RequestInit,
+): Promise<UnitProgress> => {
+  return customFetch<UnitProgress>(getSaveProgressUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveProgressInput),
+  });
+};
+
+export const getSaveProgressMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveProgress>>,
+    TError,
+    { data: BodyType<SaveProgressInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveProgress>>,
+  TError,
+  { data: BodyType<SaveProgressInput> },
+  TContext
+> => {
+  const mutationKey = ["saveProgress"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveProgress>>,
+    { data: BodyType<SaveProgressInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveProgress(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveProgressMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveProgress>>
+>;
+export type SaveProgressMutationBody = BodyType<SaveProgressInput>;
+export type SaveProgressMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Save or update progress for a unit
+ */
+export const useSaveProgress = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveProgress>>,
+    TError,
+    { data: BodyType<SaveProgressInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveProgress>>,
+  TError,
+  { data: BodyType<SaveProgressInput> },
+  TContext
+> => {
+  return useMutation(getSaveProgressMutationOptions(options));
 };

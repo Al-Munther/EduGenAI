@@ -8,6 +8,7 @@ import TeacherDashboard from "@/pages/teacher-dashboard";
 import PdfUpload from "@/pages/pdf-upload";
 import CourseGeneration from "@/pages/course-generation";
 import TeacherReview from "@/pages/teacher-review";
+import StudentCourses from "@/pages/student-courses";
 import StudentCourse from "@/pages/student-course";
 import AiTutor from "@/pages/ai-tutor";
 import UnitTest from "@/pages/unit-test";
@@ -23,6 +24,7 @@ function Router() {
         <Route path="/upload" component={PdfUpload} />
         <Route path="/generate" component={CourseGeneration} />
         <Route path="/review" component={TeacherReview} />
+        <Route path="/courses" component={StudentCourses} />
         <Route path="/student-course" component={StudentCourse} />
         <Route path="/tutor" component={AiTutor} />
         <Route path="/test" component={UnitTest} />

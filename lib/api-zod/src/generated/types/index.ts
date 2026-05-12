@@ -13,4 +13,8 @@ export * from "./generatedCourse";
 export * from "./generatedQuestion";
 export * from "./generatedUnit";
 export * from "./healthStatus";
+export * from "./publishCourseInput";
+export * from "./savedCourse";
+export * from "./saveProgressInput";
 export * from "./tutorChatInput";
+export * from "./unitProgress";

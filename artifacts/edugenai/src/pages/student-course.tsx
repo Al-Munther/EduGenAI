@@ -2,19 +2,49 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { MessageCircle, ChevronRight, CheckCircle2, Circle, BookOpen } from "lucide-react";
+import { MessageCircle, ChevronRight, CheckCircle2, Circle, BookOpen, Loader2 } from "lucide-react";
 import { useCourse } from "@/context/CourseContext";
+import { useGetCourseProgress, useSaveProgress } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetCourseProgressQueryKey } from "@workspace/api-client-react";
 
 export default function StudentCourse() {
   const [, setLocation] = useLocation();
-  const { course } = useCourse();
+  const { course, courseId } = useCourse();
+  const queryClient = useQueryClient();
+
   const [selectedUnitId, setSelectedUnitId] = useState<number>(1);
   const [completedUnits, setCompletedUnits] = useState<Set<number>>(new Set());
 
+  const { data: progressData, isLoading: progressLoading } = useGetCourseProgress(courseId ?? 0, {
+    query: { enabled: !!courseId, queryKey: getGetCourseProgressQueryKey(courseId ?? 0) },
+  });
+
+  const saveProgressMutation = useSaveProgress({
+    mutation: {
+      onSuccess: () => {
+        if (courseId) {
+          queryClient.invalidateQueries({ queryKey: getGetCourseProgressQueryKey(courseId) });
+        }
+      },
+    },
+  });
+
   useEffect(() => {
-    if (!course) { setLocation("/upload"); return; }
+    if (!course) { setLocation("/courses"); return; }
     setSelectedUnitId(course.units[0]?.id ?? 1);
   }, [course, setLocation]);
+
+  useEffect(() => {
+    if (progressData) {
+      const done = new Set<number>(
+        progressData
+          .filter((p) => p.completed)
+          .map((p) => p.unitId)
+      );
+      setCompletedUnits(done);
+    }
+  }, [progressData]);
 
   if (!course) return null;
 
@@ -23,6 +53,13 @@ export default function StudentCourse() {
 
   const markComplete = () => {
     setCompletedUnits((prev) => new Set([...prev, selectedUnitId]));
+
+    if (courseId) {
+      saveProgressMutation.mutate({
+        data: { courseId, unitId: selectedUnitId, completed: true },
+      });
+    }
+
     const currentIdx = course.units.findIndex((u) => u.id === selectedUnitId);
     const next = course.units[currentIdx + 1];
     if (next) setSelectedUnitId(next.id);
@@ -33,14 +70,20 @@ export default function StudentCourse() {
       {/* Sidebar */}
       <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
         <div className="bg-card border rounded-xl p-5 shadow-sm">
-          <h3 className="font-bold text-foreground mb-1 text-sm">{course.title}</h3>
-          <div className="space-y-2 mt-3">
-            <div className="flex justify-between text-sm font-medium">
-              <span className="text-muted-foreground">{completedUnits.size} of {course.units.length} units</span>
-              <span className="text-primary">{progress}%</span>
+          <h3 className="font-bold text-foreground mb-1 text-sm line-clamp-2">{course.title}</h3>
+          {progressLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mt-3">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading progress...
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
+          ) : (
+            <div className="space-y-2 mt-3">
+              <div className="flex justify-between text-sm font-medium">
+                <span className="text-muted-foreground">{completedUnits.size} of {course.units.length} units</span>
+                <span className="text-primary">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
         </div>
 
         <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
@@ -108,7 +151,6 @@ export default function StudentCourse() {
                   </ul>
                 </div>
               )}
-
               <div className="prose prose-slate max-w-none">
                 {selectedUnit.content.split("\n").filter(Boolean).map((para, i) => (
                   <p key={i} className="leading-relaxed text-foreground mb-4">{para}</p>
@@ -126,16 +168,17 @@ export default function StudentCourse() {
               <div className="flex items-center gap-3">
                 <Link href="/test">
                   <Button variant="outline" className="gap-2">
-                    Unit Test
-                    <ChevronRight className="w-4 h-4" />
+                    Unit Test <ChevronRight className="w-4 h-4" />
                   </Button>
                 </Link>
                 <Button
                   className="gap-2 shadow-sm px-6"
                   onClick={markComplete}
-                  disabled={completedUnits.has(selectedUnitId)}
+                  disabled={completedUnits.has(selectedUnitId) || saveProgressMutation.isPending}
                 >
-                  {completedUnits.has(selectedUnitId) ? (
+                  {saveProgressMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                  ) : completedUnits.has(selectedUnitId) ? (
                     <><CheckCircle2 className="w-4 h-4" /> Completed</>
                   ) : (
                     <>Mark Complete <ChevronRight className="w-4 h-4" /></>

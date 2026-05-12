@@ -41,6 +41,43 @@ export interface GeneratedCourse {
   questions: GeneratedQuestion[];
 }
 
+export interface PublishCourseInput {
+  title: string;
+  description: string;
+  assessmentPlan: string;
+  units: GeneratedUnit[];
+  questions: GeneratedQuestion[];
+  pdfText: string;
+  filename: string;
+}
+
+export interface SavedCourse {
+  id: number;
+  title: string;
+  description: string;
+  assessmentPlan: string;
+  units: GeneratedUnit[];
+  questions: GeneratedQuestion[];
+  pdfText: string;
+  filename: string;
+  createdAt: string;
+}
+
+export interface UnitProgress {
+  unitId: number;
+  completed: boolean;
+  score?: number | null;
+  total?: number | null;
+}
+
+export interface SaveProgressInput {
+  courseId: number;
+  unitId: number;
+  completed: boolean;
+  score?: number | null;
+  total?: number | null;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;

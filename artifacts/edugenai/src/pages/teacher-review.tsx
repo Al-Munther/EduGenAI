@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Edit2, RotateCcw, Save, Globe } from "lucide-react";
+import { CheckCircle2, Edit2, RotateCcw, Save, Globe, Loader2, AlertCircle } from "lucide-react";
 import { useCourse, type GeneratedUnit } from "@/context/CourseContext";
+import { usePublishCourse } from "@workspace/api-client-react";
 
 interface EditableUnit extends GeneratedUnit {
   isEditing: boolean;
@@ -13,12 +14,26 @@ interface EditableUnit extends GeneratedUnit {
 
 export default function TeacherReview() {
   const [, setLocation] = useLocation();
-  const { course, setCourse } = useCourse();
+  const { course, pdfText, filename, setCourse, setCourseId } = useCourse();
 
   const [units, setUnits] = useState<EditableUnit[]>([]);
   const [editData, setEditData] = useState<{ title: string; summary: string }>({ title: "", summary: "" });
   const [allApproved, setAllApproved] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [published, setPublished] = useState(false);
+
+  const publishMutation = usePublishCourse({
+    mutation: {
+      onSuccess: (saved) => {
+        setCourseId(saved.id);
+        setPublished(true);
+        setTimeout(() => setLocation("/"), 1200);
+      },
+      onError: () => {
+        setPublishError("Failed to publish course. Please try again.");
+      },
+    },
+  });
 
   useEffect(() => {
     if (!course) { setLocation("/upload"); return; }
@@ -45,8 +60,19 @@ export default function TeacherReview() {
   };
 
   const handlePublish = () => {
-    setIsPublishing(true);
-    setTimeout(() => setLocation("/student-course"), 800);
+    setPublishError(null);
+    const finalUnits = units.map(({ isEditing: _, ...rest }) => rest);
+    publishMutation.mutate({
+      data: {
+        title: course.title,
+        description: course.description,
+        assessmentPlan: course.assessmentPlan,
+        units: finalUnits,
+        questions: course.questions,
+        pdfText,
+        filename,
+      },
+    });
   };
 
   return (
@@ -55,7 +81,7 @@ export default function TeacherReview() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Review Content</h2>
           <p className="text-muted-foreground mt-1">
-            Review and edit the AI-generated course units for <span className="font-medium text-foreground">{course.title}</span>.
+            Review and edit units for <span className="font-medium text-foreground">{course.title}</span> before publishing.
           </p>
         </div>
         <Button
@@ -139,27 +165,43 @@ export default function TeacherReview() {
       </div>
 
       <div className="bg-card border rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
-        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
-          <Globe className="w-8 h-8" />
-        </div>
-        <h3 className="text-xl font-bold mb-2">Ready to publish?</h3>
-        <p className="text-muted-foreground max-w-md mx-auto mb-6">
-          Publishing will make this course available to students and activate the AI Tutor grounded on your PDF content.
-        </p>
-        <Button
-          size="lg"
-          className="px-10 gap-2 shadow-md w-full sm:w-auto"
-          onClick={handlePublish}
-          disabled={!allApproved || isPublishing}
-        >
-          {isPublishing ? (
-            <><RotateCcw className="w-4 h-4 animate-spin" /> Publishing...</>
-          ) : (
-            "Publish Course"
-          )}
-        </Button>
-        {!allApproved && (
-          <p className="text-sm text-amber-600 mt-3 font-medium">Please approve all content before publishing.</p>
+        {published ? (
+          <div className="flex flex-col items-center gap-3">
+            <CheckCircle2 className="w-12 h-12 text-green-500" />
+            <h3 className="text-xl font-bold text-green-700">Course Published!</h3>
+            <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+          </div>
+        ) : (
+          <>
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+              <Globe className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Ready to publish?</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+              Publishing saves the course to the database and makes it available for students to pick from the course library.
+            </p>
+            {publishError && (
+              <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-4 py-3 mb-4 w-full max-w-md">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {publishError}
+              </div>
+            )}
+            <Button
+              size="lg"
+              className="px-10 gap-2 shadow-md w-full sm:w-auto"
+              onClick={handlePublish}
+              disabled={!allApproved || publishMutation.isPending}
+            >
+              {publishMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</>
+              ) : (
+                "Publish Course"
+              )}
+            </Button>
+            {!allApproved && (
+              <p className="text-sm text-amber-600 mt-3 font-medium">Please approve all content before publishing.</p>
+            )}
+          </>
         )}
       </div>
     </div>

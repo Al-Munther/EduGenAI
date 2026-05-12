@@ -27,9 +27,11 @@ export interface GeneratedCourse {
 
 interface CourseContextValue {
   course: GeneratedCourse | null;
+  courseId: number | null;
   pdfText: string;
   filename: string;
   setCourse: (course: GeneratedCourse) => void;
+  setCourseId: (id: number | null) => void;
   setPdfText: (text: string) => void;
   setFilename: (name: string) => void;
   clearCourse: () => void;
@@ -39,17 +41,19 @@ const CourseContext = createContext<CourseContextValue | null>(null);
 
 export function CourseProvider({ children }: { children: React.ReactNode }) {
   const [course, setCourse] = useState<GeneratedCourse | null>(null);
+  const [courseId, setCourseId] = useState<number | null>(null);
   const [pdfText, setPdfText] = useState<string>("");
   const [filename, setFilename] = useState<string>("");
 
   const clearCourse = () => {
     setCourse(null);
+    setCourseId(null);
     setPdfText("");
     setFilename("");
   };
 
   return (
-    <CourseContext.Provider value={{ course, pdfText, filename, setCourse, setPdfText, setFilename, clearCourse }}>
+    <CourseContext.Provider value={{ course, courseId, pdfText, filename, setCourse, setCourseId, setPdfText, setFilename, clearCourse }}>
       {children}
     </CourseContext.Provider>
   );
