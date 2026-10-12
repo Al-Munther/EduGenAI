@@ -2,13 +2,18 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Layers, FileText, Clock, ChevronRight, Loader2, AlertCircle, GraduationCap } from "lucide-react";
-import { useListSavedCourses } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { useCourse, type GeneratedUnit, type GeneratedQuestion } from "@/context/CourseContext";
 
 export default function StudentCourses() {
   const [, setLocation] = useLocation();
   const { setCourse, setCourseId, setPdfText, setFilename } = useCourse();
-  const { data: courses, isLoading, isError } = useListSavedCourses();
+  const { data: courses, isLoading, isError } = useQuery({
+    queryKey: ["api", "courses", "published"],
+    queryFn: () => api.courses.listPublished(),
+  });
+  console.log(`[CourseLibrary] Published courses from API:`, courses);
 
   const handleSelectCourse = (course: {
     id: number;
@@ -17,21 +22,24 @@ export default function StudentCourses() {
     assessmentPlan: string;
     units: unknown;
     questions: unknown;
-    pdfText: string;
-    filename: string;
+    pdfText?: string;
+    filename?: string;
   }) => {
     setCourse({
       title: course.title,
       description: course.description,
-      assessmentPlan: course.assessmentPlan,
-      units: course.units as GeneratedUnit[],
-      questions: course.questions as GeneratedQuestion[],
+      assessmentPlan: course.assessmentPlan || "",
+      units: (course.units || []) as GeneratedUnit[],
+      questions: (course.questions || []) as GeneratedQuestion[],
     });
     setCourseId(course.id);
     setPdfText(course.pdfText || "");
     setFilename(course.filename || "");
     setLocation("/student-course");
   };
+
+  const courseList = courses ?? [];
+  console.log(`[CourseLibrary] Normalized course list (${courseList.length} courses):`, courseList.map((c: any) => ({ id: c.id, title: c.title, status: c.status })));
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -47,20 +55,20 @@ export default function StudentCourses() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" /> Loading courses...
+          <Loader2 className="w-5 h-5 animate-spin" /> Loading published courses...
         </div>
       ) : isError ? (
         <div className="flex items-center gap-2 text-destructive bg-destructive/10 rounded-lg px-4 py-4">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           Failed to load courses. Please check your connection.
         </div>
-      ) : !courses || courses.length === 0 ? (
+      ) : courseList.length === 0 ? (
         <Card className="border-dashed border-2 border-primary/20 bg-primary/5 shadow-sm">
           <CardContent className="p-16 flex flex-col items-center text-center">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
               <BookOpen className="w-8 h-8" />
             </div>
-            <h4 className="font-semibold text-foreground text-lg mb-2">No courses available yet</h4>
+            <h4 className="font-semibold text-foreground text-lg mb-2">No published courses available yet</h4>
             <p className="text-sm text-muted-foreground max-w-xs">
               Ask your professor to publish a course. Published courses will appear here.
             </p>
@@ -68,7 +76,7 @@ export default function StudentCourses() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {courses.map((course) => {
+          {courseList.map((course: any) => {
             const unitCount = (course.units as unknown[])?.length ?? 0;
             const questionCount = (course.questions as unknown[])?.length ?? 0;
 

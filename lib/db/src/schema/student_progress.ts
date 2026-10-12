@@ -2,11 +2,14 @@ import { pgTable, serial, integer, boolean, timestamp } from "drizzle-orm/pg-cor
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { coursesTable } from "./courses";
+import { usersTable } from "./users";
+import { courseUnitsTable } from "./course_units";
 
 export const studentProgressTable = pgTable("student_progress", {
   id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().default(2).references(() => usersTable.id, { onDelete: "cascade" }),
   courseId: integer("course_id").notNull().references(() => coursesTable.id, { onDelete: "cascade" }),
-  unitId: integer("unit_id").notNull(),
+  unitId: integer("unit_id").notNull().references(() => courseUnitsTable.id, { onDelete: "cascade" }),
   completed: boolean("completed").notNull().default(false),
   score: integer("score"),
   total: integer("total"),

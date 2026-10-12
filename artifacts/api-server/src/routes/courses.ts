@@ -1,107 +1,171 @@
 import { Router, type IRouter } from "express";
-import multer from "multer";
-import pdfParse from "pdf-parse";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, coursesTable, uploadedFilesTable, documentChunksTable, courseUnitsTable, courseQuestionsTable, studentProgressTable, testAttemptsTable, tutorConversationsTable, tutorMessagesTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { handleRouteError } from "../lib/route-error";
 
 const router: IRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-const COURSE_GENERATION_PROMPT = (pdfText: string, filename: string) => `
-You are an expert educational course designer. Analyze the following document and generate a structured course.
-
-Document: "${filename}"
-
-Content:
----
-${pdfText.slice(0, 12000)}
----
-
-Generate a comprehensive course based on this material. Return ONLY valid JSON with this exact structure:
-{
-  "title": "Course title derived from the material",
-  "description": "2-3 sentence course description",
-  "assessmentPlan": "Brief description of how students will be assessed",
-  "units": [
-    {
-      "id": 1,
-      "title": "Unit title",
-      "summary": "1-2 sentence summary of this unit",
-      "content": "3-4 paragraphs of rich lesson content based on the material. Use real concepts and examples from the document.",
-      "objectives": ["Learning objective 1", "Learning objective 2", "Learning objective 3"]
-    }
-  ],
-  "questions": [
-    {
-      "id": 1,
-      "unitId": 1,
-      "question": "Multiple choice question about unit 1 content",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,
-      "explanation": "Explanation of why this is correct"
-    }
-  ]
-}
-
-Requirements:
-- Generate exactly 4 units covering different aspects of the material
-- Generate 5 questions total (at least 1 per unit, spread across units) — make sure unitId matches the unit number
-- All content must come directly from the uploaded document
-- Questions must test understanding of the actual document content
-- Learning objectives must be specific and measurable
-- Lesson content must be detailed and educational (at least 3 paragraphs each)
-`;
-
-router.post("/courses/generate-from-pdf", upload.single("pdf"), async (req, res): Promise<void> => {
+router.get("/courses", async (req, res): Promise<void> => {
   try {
-    if (!req.file) {
-      res.status(400).json({ error: "No PDF file uploaded" });
-      return;
-    }
-
-    const filename = req.file.originalname || "uploaded.pdf";
-
-    let pdfText: string;
-    try {
-      const data = await pdfParse(req.file.buffer);
-      pdfText = data.text;
-    } catch {
-      res.status(400).json({ error: "Failed to parse PDF. Please ensure the file is a valid PDF." });
-      return;
-    }
-
-    if (!pdfText || pdfText.trim().length < 50) {
-      res.status(400).json({ error: "The PDF appears to be empty or contains no readable text." });
-      return;
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      max_completion_tokens: 8192,
-      messages: [
-        {
-          role: "user",
-          content: COURSE_GENERATION_PROMPT(pdfText, filename),
-        },
-      ],
-    });
-
-    const content = completion.choices[0]?.message?.content ?? "";
-
-    let course;
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON found in response");
-      course = JSON.parse(jsonMatch[0]);
-    } catch {
-      req.log.error({ content }, "Failed to parse AI response as JSON");
-      res.status(500).json({ error: "Failed to parse AI response. Please try again." });
-      return;
-    }
-
-    res.json({ ...course, pdfText });
+    const courses = await db.select().from(coursesTable).orderBy(desc(coursesTable.createdAt));
+    res.json(courses);
   } catch (err) {
-    req.log.error({ err }, "Error generating course from PDF");
-    res.status(500).json({ error: "Failed to generate course. Please try again." });
+    req.log.error({ err }, "Error listing courses");
+    handleRouteError(res, err, "ListCourses");
+  }
+});
+
+router.get("/courses/teacher/:teacherId", async (req, res): Promise<void> => {
+  try {
+    const teacherId = parseInt(req.params.teacherId);
+    if (isNaN(teacherId)) { res.status(400).json({ error: "Invalid teacherId" }); return; }
+
+    const courses = await db
+      .select()
+      .from(coursesTable)
+      .where(eq(coursesTable.teacherId, teacherId))
+      .orderBy(desc(coursesTable.createdAt));
+
+    res.json(courses);
+  } catch (err) {
+    req.log.error({ err }, "Error listing teacher courses");
+    handleRouteError(res, err, "ListTeacherCourses");
+  }
+});
+
+router.get("/courses/published", async (req, res): Promise<void> => {
+  try {
+    const courses = await db
+      .select()
+      .from(coursesTable)
+      .where(eq(coursesTable.status, "published"))
+      .orderBy(desc(coursesTable.createdAt));
+
+    res.json(courses);
+  } catch (err) {
+    req.log.error({ err }, "Error listing published courses");
+    handleRouteError(res, err, "ListPublishedCourses");
+  }
+});
+
+router.post("/courses", async (req, res): Promise<void> => {
+  try {
+    console.log("CREATE COURSE REQ BODY:", req.body);
+
+    const { title, description, teacherId, teacher_id } = req.body as {
+      title: string;
+      description?: string;
+      teacherId?: number;
+      teacher_id?: number;
+    };
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      res.status(400).json({ error: "Validation failed", details: "title is required and must be a non-empty string" });
+      return;
+    }
+
+    const resolvedTeacherId = teacherId ?? teacher_id ?? 1;
+
+    console.log("CREATE COURSE INSERT:", { title, description, teacherId: resolvedTeacherId });
+
+    const [course] = await db
+      .insert(coursesTable)
+      .values({
+        title: title.trim(),
+        description: description?.trim() || "",
+        teacherId: resolvedTeacherId,
+      })
+      .returning();
+
+    res.status(201).json(course);
+  } catch (err) {
+    req.log.error({ err }, "Error creating course");
+    handleRouteError(res, err, "CreateCourse");
+  }
+});
+
+router.get("/courses/:id", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+    const [course] = await db.select().from(coursesTable).where(eq(coursesTable.id, id));
+    if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+
+    res.json(course);
+  } catch (err) {
+    req.log.error({ err }, "Error getting course");
+    handleRouteError(res, err, "GetCourse");
+  }
+});
+
+router.put("/courses/:courseId/publish", async (req, res): Promise<void> => {
+  try {
+    const courseId = parseInt(req.params.courseId);
+    if (isNaN(courseId)) { res.status(400).json({ error: "Invalid courseId" }); return; }
+
+    const [existing] = await db.select().from(coursesTable).where(eq(coursesTable.id, courseId));
+    if (!existing) { res.status(404).json({ error: "Course not found" }); return; }
+
+    console.log(`[Publish] courseId=${courseId}: status before publish = "${existing.status}"`);
+
+    if (existing.status !== "approved") {
+      console.log(`[Publish] courseId=${courseId}: REJECTED — status is "${existing.status}", need "approved"`);
+      res.status(400).json({ error: "Course must be reviewed and approved before publishing." });
+      return;
+    }
+
+    const { units, questions, assessmentPlan } = req.body as {
+      units?: object[];
+      questions?: object[];
+      assessmentPlan?: string;
+    };
+
+    const [course] = await db
+      .update(coursesTable)
+      .set({
+        status: "published",
+        units: units || existing.units || [],
+        questions: questions || existing.questions || [],
+        assessmentPlan: assessmentPlan || existing.assessmentPlan || "",
+      })
+      .where(eq(coursesTable.id, courseId))
+      .returning();
+
+    console.log(`[Publish] courseId=${courseId}: status after publish = "${course.status}"`);
+    req.log.info({ courseId }, "Course published");
+    res.json(course);
+  } catch (err) {
+    req.log.error({ err }, "Error publishing course");
+    handleRouteError(res, err, "PublishCourse");
+  }
+});
+
+router.delete("/courses/:courseId", async (req, res): Promise<void> => {
+  try {
+    const courseId = parseInt(req.params.courseId);
+    if (isNaN(courseId)) { res.status(400).json({ error: "Invalid courseId" }); return; }
+
+    const [course] = await db.select().from(coursesTable).where(eq(coursesTable.id, courseId));
+    if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+
+    req.log.info({ courseId, title: course.title }, "Deleting course with related data");
+
+    await db.delete(tutorMessagesTable).where(eq(tutorMessagesTable.conversationId, courseId));
+    await db.delete(tutorConversationsTable).where(eq(tutorConversationsTable.courseId, courseId));
+    await db.delete(testAttemptsTable).where(eq(testAttemptsTable.courseId, courseId));
+    await db.delete(studentProgressTable).where(eq(studentProgressTable.courseId, courseId));
+    await db.delete(courseQuestionsTable).where(eq(courseQuestionsTable.courseId, courseId));
+    await db.delete(courseUnitsTable).where(eq(courseUnitsTable.courseId, courseId));
+    await db.delete(documentChunksTable).where(eq(documentChunksTable.courseId, courseId));
+    await db.delete(uploadedFilesTable).where(eq(uploadedFilesTable.courseId, courseId));
+    await db.delete(coursesTable).where(eq(coursesTable.id, courseId));
+
+    req.log.info({ courseId }, "Course deleted successfully");
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting course");
+    handleRouteError(res, err, "DeleteCourse");
   }
 });
 

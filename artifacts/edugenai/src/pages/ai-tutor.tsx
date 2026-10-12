@@ -3,21 +3,29 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Send, Bot, User, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Send, Bot, User, Loader2, AlertCircle, BookOpen } from "lucide-react";
 import { useCourse } from "@/context/CourseContext";
+
+interface Source {
+  chunkIndex: number;
+  pageNumber?: number;
+  similarity: number;
+  excerpt: string;
+}
 
 interface Message {
   id: number;
   role: "ai" | "user";
   content: string;
+  sources?: Source[];
   isStreaming?: boolean;
 }
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
 export default function AiTutor() {
   const [, setLocation] = useLocation();
-  const { course, pdfText } = useCourse();
+  const { course, courseId } = useCourse();
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -25,24 +33,34 @@ export default function AiTutor() {
       role: "ai",
       content: course
         ? `Hi! I'm your AI tutor for "${course.title}". I can only answer questions based on the uploaded course material. What would you like to know?`
-        : "Hi! I'm your AI tutor. Please upload a PDF to start.",
+        : "Hi! I'm your AI tutor. Please select a course to start.",
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!course) { setLocation("/upload"); }
+    if (!course) { setLocation("/courses"); }
   }, [course, setLocation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const toggleSources = (msgId: number) => {
+    setExpandedSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(msgId)) next.delete(msgId);
+      else next.add(msgId);
+      return next;
+    });
+  };
+
   const handleSend = async () => {
-    if (!inputValue.trim() || isLoading || !course) return;
+    if (!inputValue.trim() || isLoading || !course || !courseId) return;
 
     const userMsg: Message = { id: Date.now(), role: "user", content: inputValue };
     setMessages((prev) => [...prev, userMsg]);
@@ -63,8 +81,7 @@ export default function AiTutor() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: inputValue,
-          courseTitle: course.title,
-          courseContext: pdfText,
+          courseId,
           history,
         }),
       });
@@ -74,6 +91,7 @@ export default function AiTutor() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
+      let finalSources: Source[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -92,15 +110,18 @@ export default function AiTutor() {
                 prev.map((m) => (m.id === streamingId ? { ...m, content: accumulated } : m))
               );
             }
+            if (data.sources) {
+              finalSources = data.sources;
+            }
             if (data.done) break;
           } catch {
-            // ignore parse errors on partial chunks
+            // ignore parse errors
           }
         }
       }
 
       setMessages((prev) =>
-        prev.map((m) => (m.id === streamingId ? { ...m, isStreaming: false } : m))
+        prev.map((m) => (m.id === streamingId ? { ...m, isStreaming: false, sources: finalSources } : m))
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -125,26 +146,54 @@ export default function AiTutor() {
             <Bot className="w-6 h-6 text-primary" />
             AI Tutor — {course.title}
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Answers based only on your uploaded course material.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Answers based only on your uploaded course material using RAG.</p>
         </div>
       </div>
 
       <Card className="flex-1 flex flex-col shadow-sm border overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}>
-                {msg.role === "ai" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+            <div key={msg.id}>
+              <div className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}>
+                  {msg.role === "ai" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                </div>
+                <div className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                    : "bg-muted/50 border rounded-tl-sm text-foreground"
+                }`}>
+                  {msg.content || (msg.isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : "")}
+                </div>
               </div>
-              <div className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground rounded-tr-sm"
-                  : "bg-muted/50 border rounded-tl-sm text-foreground"
-              }`}>
-                {msg.content || (msg.isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : "")}
-              </div>
+
+              {msg.sources && msg.sources.length > 0 && msg.role === "ai" && (
+                <div className="ml-12 mt-2">
+                  <button
+                    onClick={() => toggleSources(msg.id)}
+                    className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-medium"
+                  >
+                    <BookOpen className="w-3 h-3" />
+                    {expandedSources.has(msg.id) ? "Hide" : "Show"} sources ({msg.sources.length})
+                  </button>
+                  {expandedSources.has(msg.id) && (
+                    <div className="mt-2 space-y-2">
+                      {msg.sources.map((source, i) => (
+                        <div key={i} className="bg-primary/5 border border-primary/10 rounded-lg p-3 text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                            <span className="font-medium text-primary">Chunk {source.chunkIndex}</span>
+                            {source.pageNumber && <span>Page {source.pageNumber}</span>}
+                            <span>Similarity: {source.similarity}</span>
+                          </div>
+                          <p className="text-muted-foreground line-clamp-2">{source.excerpt}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {error && (

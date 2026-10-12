@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { runMigrations } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +16,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
+async function main() {
+  const shouldMigrate = process.env["RUN_MIGRATIONS_ON_STARTUP"] !== "false";
+  if (shouldMigrate) {
+    try {
+      await runMigrations();
+      logger.info("Database migrations completed");
+    } catch (err) {
+      logger.error({ err }, "Failed to run migrations");
+      process.exit(1);
+    }
+  } else {
+    console.log("[Startup] Skipping migrations (RUN_MIGRATIONS_ON_STARTUP=false)");
   }
 
-  logger.info({ port }, "Server listening");
-});
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+
+    logger.info({ port }, "Server listening");
+  });
+}
+
+main();

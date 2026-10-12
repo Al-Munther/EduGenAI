@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, coursesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { handleRouteError } from "../lib/route-error";
 
 const router: IRouter = Router();
 
@@ -10,7 +11,7 @@ router.get("/courses/saved", async (req, res): Promise<void> => {
     res.json(courses);
   } catch (err) {
     req.log.error({ err }, "Error listing courses");
-    res.status(500).json({ error: "Failed to list courses" });
+    handleRouteError(res, err, "ListSavedCourses");
   }
 });
 
@@ -33,13 +34,22 @@ router.post("/courses/saved", async (req, res): Promise<void> => {
 
     const [course] = await db
       .insert(coursesTable)
-      .values({ title, description, assessmentPlan, units, questions, pdfText: pdfText || "", filename: filename || "" })
+      .values({
+        title,
+        description: description || "",
+        assessmentPlan: assessmentPlan || "",
+        units: units || [],
+        questions: questions || [],
+        pdfText: pdfText || "",
+        filename: filename || "",
+        status: "published",
+      })
       .returning();
 
     res.status(201).json(course);
   } catch (err) {
     req.log.error({ err }, "Error publishing course");
-    res.status(500).json({ error: "Failed to publish course" });
+    handleRouteError(res, err, "SaveCourse");
   }
 });
 
@@ -54,7 +64,7 @@ router.get("/courses/saved/:id", async (req, res): Promise<void> => {
     res.json(course);
   } catch (err) {
     req.log.error({ err }, "Error getting course");
-    res.status(500).json({ error: "Failed to get course" });
+    handleRouteError(res, err, "GetSavedCourse");
   }
 });
 
@@ -69,7 +79,7 @@ router.delete("/courses/saved/:id", async (req, res): Promise<void> => {
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Error deleting course");
-    res.status(500).json({ error: "Failed to delete course" });
+    handleRouteError(res, err, "DeleteSavedCourse");
   }
 });
 
